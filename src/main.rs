@@ -10,28 +10,39 @@ use glutin_window::GlutinWindow;
 use opengl_graphics::{GlGraphics, OpenGL};
 
 mod snake;
-use snake::Snake;
+use snake::{Snake, Food};
 
 pub struct App {
 	gl: GlGraphics,
-	snake: Snake
+	snake: Snake,
+	food: Food,
+	height: i32,
+	width: i32,
 }
 
 impl App {
 	fn render(&mut self, args: &RenderArgs){
 		use graphics::clear;
 		
-		const BACKGROUND: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
+		const BACKGROUND: [f32; 4] = [0.3, 0.3, 0.3, 1.0];
+
+		self.width = args.width as i32;
+		self.height = args.height as i32;
 
 		self.gl.draw(args.viewport(), |_, gl| {
 			clear(BACKGROUND, gl);
 		});
 
+		self.food.render(&mut self.gl, args);
 		self.snake.render(&mut self.gl, args);
 	}
 
-	fn update(&mut self, args: &UpdateArgs){
+	fn update(&mut self, _args: &UpdateArgs){
 		self.snake.update();
+		let food = &self.food;
+		if self.snake.eat(food){
+			self.food.spawn(self.width as i32, self.height as i32);
+		}
 	}
 
 	fn press(&mut self, args: &Button) {
@@ -63,10 +74,16 @@ fn main() {
 		.exit_on_esc(true)
 		.build()
 		.unwrap();
+
+	let mut food = Food::new(20);
+	food.spawn(400, 400);
 	
 	let mut app = App {
 		gl: GlGraphics::new(opengl),
 		snake: Snake::new(0, 0, 20, 1),
+		food: food,
+		height: 400,
+		width: 400,
 	};
 
 	let mut events = Events::new(EventSettings::new()).ups(15);
