@@ -10,10 +10,6 @@ struct Vec2 {
 }
 
 impl Vec2 {
-	fn hit_screen(&mut self, width: i32, height: i32) -> bool{
-		self.x < 0 || self.x > width ||
-			self.y < 0 || self.y > height
-	}
 
 	fn collide(&mut self, target: &Vec2) -> bool{
 		self.x == target.x && self.y == target.y
@@ -70,7 +66,8 @@ pub struct Snake {
 	body: Vec<Vec2>,
 	vel: Vec<i32>,
 	size: i32,
-	speed: i32
+	speed: i32,
+	dead: bool
 }
 
 impl Snake {
@@ -81,8 +78,24 @@ impl Snake {
 			body: vec![],
 			vel: vec![0,0],
 			size: size,
-			speed: speed
+			speed: speed,
+			dead: false
 		}
+	}
+
+	pub fn hit_screen(&mut self, width: i32, height: i32) -> bool{
+		self.head.x < 0 || self.head.x > width ||
+			self.head.y < 0 || self.head.y > height
+	}
+
+	pub fn hit_body(&mut self) -> bool{
+		for (i, body) in self.body.iter().enumerate() {
+			if i > 0 && self.head.collide(&body){
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	pub fn render(&mut self, gl: &mut GlGraphics, args: &RenderArgs){
@@ -112,30 +125,44 @@ impl Snake {
 	}
 
 	pub fn update(&mut self) {
-		self.body.insert(0, self.head.clone());
-		self.head.x += self.vel[0] * self.size;
-		self.head.y += self.vel[1] * self.size;
-		self.body.pop();
+		if !self.dead {
+			self.body.insert(0, self.head.clone());
+			self.head.x += self.vel[0] * self.size;
+			self.head.y += self.vel[1] * self.size;
+			self.body.pop();
+		}
+		
 	}
 
 	pub fn up(&mut self) {
-		self.vel[0] = 0;
-		self.vel[1] = -self.speed;
+		if self.vel[1] == 0{
+			self.vel[0] = 0;
+			self.vel[1] = -self.speed;
+		}
+		
 	}
 
 	pub fn down(&mut self){
-		self.vel[0] = 0;
-		self.vel[1] = self.speed;
+		if self.vel[1] == 0{
+			self.vel[0] = 0;
+			self.vel[1] = self.speed;
+		}
 	}
 
 	pub fn left(&mut self){
-		self.vel[0] = -self.speed;
-		self.vel[1] = 0;
+		if self.vel[0] == 0{
+			self.vel[0] = -self.speed;
+			self.vel[1] = 0;
+		}
+		
 	}
 
 	pub fn right(&mut self){
-		self.vel[0] = self.speed;
-		self.vel[1] = 0;
+		if self.vel[0] == 0{
+			self.vel[0] = self.speed;
+			self.vel[1] = 0;
+		}
+		
 	}
 
 }

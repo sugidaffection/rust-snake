@@ -21,6 +21,14 @@ pub struct App {
 }
 
 impl App {
+
+	fn reset(&mut self){
+		self.snake = Snake::new(0, 0, 20, 1);
+		let mut food = Food::new(20);
+		food.spawn(400, 400);
+		self.food = food;
+	}
+
 	fn render(&mut self, args: &RenderArgs){
 		use graphics::clear;
 		
@@ -42,6 +50,11 @@ impl App {
 		let food = &self.food;
 		if self.snake.eat(food){
 			self.food.spawn(self.width as i32, self.height as i32);
+		}
+
+		if self.snake.hit_screen(self.width, self.height) ||
+			self.snake.hit_body(){
+			self.reset();
 		}
 	}
 
