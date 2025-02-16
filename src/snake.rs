@@ -1,173 +1,165 @@
-use crate::math::Matrix2d;
-use graphics::{ellipse, rectangle, DrawState, Graphics, Transformed};
-use rand::{thread_rng, Rng};
+use piston_window::{rectangle, Graphics, Transformed};
 
-#[derive(Clone)]
-struct Vec2 {
-    x: i32,
-    y: i32,
+use crate::{food::Food, math::Matrix2d, vec2::Vec2};
+
+#[derive(PartialEq, Debug)]
+pub enum DirectionState {
+    LEFT,
+    RIGHT,
+    UP,
+    DOWN,
 }
 
-impl Vec2 {
-    fn collide(&mut self, target: &Vec2) -> bool {
-        self.x == target.x && self.y == target.y
-    }
-
-    fn generate_pos(&mut self, max: i32, step: i32) -> i32 {
-        let mut thread = thread_rng();
-        let n = thread.gen_range(0..max);
-        if n % step == 0 {
-            return n;
-        } else {
-            return self.generate_pos(max, step);
-        }
-    }
-
-    fn random_pos(&mut self, max_x: i32, max_y: i32, step: i32) {
-        self.x = self.generate_pos(max_x, step);
-        self.y = self.generate_pos(max_y, step);
-    }
-}
-
-pub struct Food {
-    pos: Vec2,
-    size: i32,
-}
-
-impl Food {
-    pub fn new(size: i32) -> Food {
-        let food = Food {
-            pos: Vec2 { x: 0, y: 0 },
-            size: size,
-        };
-
-        food
-    }
-
-    /// Spawn food in random position inside screen
-    pub fn spawn(&mut self, w: i32, h: i32) {
-        self.pos.random_pos(w, h, self.size);
-    }
-
-    pub fn render<B: Graphics>(&mut self, t: Matrix2d, b: &mut B) {
-        const COLOR: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-        ellipse::Ellipse::new(COLOR).draw(
-            [0.0, 0.0, self.size as f64, self.size as f64],
-            &DrawState::default(),
-            t.trans(self.pos.x as f64, self.pos.y as f64),
-            b,
-        );
-    }
-}
-
+#[derive(Debug)]
 pub struct Snake {
     head: Vec2,
     body: Vec<Vec2>,
-    vel: Vec<i32>,
-    size: i32,
-    speed: i32,
-    dead: bool,
+    size: f64,
+    start_position: Vec2,
+    target_position: Vec2,
+    position: Vec2,
+    dir_state: DirectionState,
+    dir_move: Vec2,
+    time_elapsed: f64,
+    animation_delay: f64,
+    movement_speed: f64,
 }
 
 impl Snake {
-    pub fn new(x: i32, y: i32, size: i32, speed: i32) -> Snake {
-        Snake {
-            head: Vec2 { x, y },
+    pub fn new(size: f64) -> Self {
+        Self {
+            head: Vec2::new(0.0, 0.0),
             body: vec![],
-            vel: vec![0, 0],
-            size: size,
-            speed: speed,
-            dead: false,
+            size,
+            start_position: Vec2::new(0.0, 0.0),
+            target_position: Vec2::new(20.0, 0.0),
+            position: Vec2::new(0.0, 0.0),
+            dir_state: DirectionState::RIGHT,
+            dir_move: Vec2::new(0.0, 0.0),
+            time_elapsed: 0.0,
+            animation_delay: 0.4,
+            movement_speed: 0.6,
         }
     }
 
-    // Check if snake is hit screen border
-    pub fn hit_screen(&mut self, width: i32, height: i32) -> bool {
-        self.head.x < 0 || self.head.x > width || self.head.y < 0 || self.head.y > height
-    }
-
-    /// Check if snake is colliding with bodies
-    pub fn hit_body(&mut self) -> bool {
-        for (i, body) in self.body.iter().enumerate() {
-            if i > 0 && self.head.collide(&body) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    pub fn render<B: Graphics>(&mut self, t: Matrix2d, b: &mut B) {
-        const HEAD: [f32; 4] = [1.0, 0.8, 0.5, 1.0];
-        const BODY: [f32; 4] = [1.0, 0.5, 0.8, 1.0];
+    pub fn render<G: Graphics>(&self, t: Matrix2d, g: &mut G) {
+        const HEAD_COLOR: [f32; 4] = [0.0, 1.0, 0.6, 1.0];
+        const BODY_COLOR: [f32; 4] = [0.3, 0.3, 0.3, 1.0];
         let rect = rectangle::square(0.0, 0.0, self.size as f64);
-        for body in self.body.iter() {
-            rectangle(BODY, rect, t.trans(body.x as f64, body.y as f64), b);
+
+        for segment in &self.body {
+            rectangle(
+                BODY_COLOR,
+                rect,
+                t.trans(segment.x as f64, segment.y as f64),
+                g,
+            );
         }
+
         rectangle(
-            HEAD,
+            HEAD_COLOR,
             rect,
             t.trans(self.head.x as f64, self.head.y as f64),
-            b,
+            g,
         );
     }
 
     pub fn eat(&mut self, food: &Food) -> bool {
-        let pos = &food.pos;
-        // check if snake head is colliding with food
-        if self.head.collide(pos) {
-            // create new tail from head position if body is empty
-            // else create from current tail position
-            self.body.push(if self.body.len() > 0 {
-                self.body.last().unwrap().clone()
-            } else {
-                self.head.clone()
-            });
+        if self.head.collide(&food.pos) {
+            let last_segment = self.body.last().unwrap_or(&self.head);
+            self.body.push(last_segment.clone());
 
-            return true;
+            self.movement_speed *= 0.9;
+
+            true
+        } else {
+            false
         }
-
-        false
     }
 
-    pub fn update(&mut self) {
-        // check if snake alive
-        if !self.dead {
-            // insert new body from current head position
-            self.body.insert(0, self.head.clone());
-            // update head position
-            self.head.x += self.vel[0] * self.size;
-            self.head.y += self.vel[1] * self.size;
-            // remove tail
-            self.body.pop();
+    pub fn update(&mut self, dt: f64) {
+        self.movement_speed = self.movement_speed.max(0.1);
+        self.animation_delay = self.animation_delay.max(0.1).min(self.movement_speed);
+        self.time_elapsed += dt;
+
+        if self.time_elapsed >= self.movement_speed {
+            self.time_elapsed = 0.0; // Reset timer
+
+            // Update direction
+            match self.dir_state {
+                DirectionState::LEFT => {
+                    self.dir_move.x = -1.0;
+                    self.dir_move.y = 0.0;
+                }
+                DirectionState::RIGHT => {
+                    self.dir_move.x = 1.0;
+                    self.dir_move.y = 0.0;
+                }
+                DirectionState::UP => {
+                    self.dir_move.y = -1.0;
+                    self.dir_move.x = 0.0;
+                }
+                DirectionState::DOWN => {
+                    self.dir_move.y = 1.0;
+                    self.dir_move.x = 0.0;
+                }
+            }
+
+            // Set new start and target positions
+            self.start_position.x = (self.position.x / self.size).round() * self.size;
+            self.start_position.y = (self.position.y / self.size).round() * self.size;
+
+            let last_target = self.target_position.clone();
+
+            self.target_position.x = self.start_position.x + (self.dir_move.x * self.size);
+            self.target_position.y = self.start_position.y + (self.dir_move.y * self.size);
+
+            if !self.body.is_empty() {
+                for i in (1..self.body.len()).rev() {
+                    self.body[i] = self.body[i - 1].clone();
+                }
+                self.body[0] = last_target; // First segment moves to last head position
+            }
         }
+
+        // Calculate progress (normalized 0.0 to 1.0)
+        let t = (self.time_elapsed / self.animation_delay).clamp(0.0, 1.0);
+
+        // Apply ease-in function: Quadratic acceleration
+        let eased_t = t * t;
+
+        // Interpolate smoothly
+        self.position.x =
+            self.start_position.x + (self.target_position.x - self.start_position.x) * eased_t;
+        self.position.y =
+            self.start_position.y + (self.target_position.y - self.start_position.y) * eased_t;
+
+        // Update snake head and body
+        self.head.x = self.position.x;
+        self.head.y = self.position.y;
     }
 
     pub fn up(&mut self) {
-        if self.vel[1] == 0 {
-            self.vel[0] = 0;
-            self.vel[1] = -self.speed;
+        if self.dir_state != DirectionState::DOWN {
+            self.dir_state = DirectionState::UP;
         }
     }
 
     pub fn down(&mut self) {
-        if self.vel[1] == 0 {
-            self.vel[0] = 0;
-            self.vel[1] = self.speed;
+        if self.dir_state != DirectionState::UP {
+            self.dir_state = DirectionState::DOWN;
         }
     }
 
     pub fn left(&mut self) {
-        if self.vel[0] == 0 {
-            self.vel[0] = -self.speed;
-            self.vel[1] = 0;
+        if self.dir_state != DirectionState::RIGHT {
+            self.dir_state = DirectionState::LEFT;
         }
     }
 
     pub fn right(&mut self) {
-        if self.vel[0] == 0 {
-            self.vel[0] = self.speed;
-            self.vel[1] = 0;
+        if self.dir_state != DirectionState::LEFT {
+            self.dir_state = DirectionState::RIGHT;
         }
     }
 }

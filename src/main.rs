@@ -1,94 +1,38 @@
 use piston_window::*;
+
+mod app;
+mod food;
 mod snake;
-use snake::{Food, Snake};
+mod vec2;
 
-pub struct App {
-    snake: Snake,
-    food: Food,
-    height: i32,
-    width: i32,
-}
+const WINDOW_WIDTH: f64 = 800.0;
+const WINDOW_HEIGHT: f64 = 600.0;
+const GRID_SIZE: f64 = 20.0;
+const UPS: u64 = 60;
+const FPS: u64 = 60;
 
-impl App {
-    /// Reset game state
-    fn reset(&mut self) {
-        self.snake = Snake::new(0, 0, 20, 1);
-        let mut food = Food::new(20);
-        food.spawn(400, 400);
-        self.food = food;
-    }
+fn main() -> Result<(), String> {
+    let mut window: PistonWindow =
+        WindowSettings::new("Snake", [WINDOW_WIDTH as u32, WINDOW_HEIGHT as u32])
+            .exit_on_esc(true)
+            .build()
+            .map_err(|e| format!("Failed to build PistonWindow: {}", e))?;
 
-    fn render<B: Graphics>(&mut self, t: math::Matrix2d, b: &mut B) {
-        const BACKGROUND: [f32; 4] = [0.3, 0.3, 0.3, 1.0];
-
-        clear(BACKGROUND, b);
-
-        self.food.render(t, b);
-        self.snake.render(t, b);
-    }
-
-    fn render_update(&mut self, args: &RenderArgs) {
-        // Update window size
-        self.width = args.window_size[0] as i32;
-        self.height = args.window_size[1] as i32;
-    }
-
-    fn update(&mut self, _args: &UpdateArgs) {
-        self.snake.update();
-        let food = &self.food;
-        if self.snake.eat(food) {
-            self.food.spawn(self.width as i32, self.height as i32);
-        }
-
-        if self.snake.hit_screen(self.width, self.height) || self.snake.hit_body() {
-            self.reset();
-        }
-    }
-
-    fn press(&mut self, args: &Button) {
-        if let &Button::Keyboard(key) = args {
-            match key {
-                Key::Up => {
-                    self.snake.up();
-                }
-                Key::Down => {
-                    self.snake.down();
-                }
-                Key::Left => {
-                    self.snake.left();
-                }
-                Key::Right => {
-                    self.snake.right();
-                }
-                _ => {}
-            }
-        }
-    }
-}
-
-fn main() {
-    let mut window: PistonWindow = WindowSettings::new("Snake", (640, 480))
-        .exit_on_esc(true)
-        .build()
-        .unwrap_or_else(|e| panic!("Failed to build PistonWindow: {}", e));
-
-    // update per seconds
-    window.set_ups(15);
-
-    let mut food = Food::new(20);
-    food.spawn(400, 400);
-
-    let mut app = App {
-        snake: Snake::new(0, 0, 20, 1),
-        food: food,
-        height: 400,
-        width: 400,
-    };
+    window.set_ups(UPS);
+    window.set_max_fps(FPS);
+    let mut app = app::App::new(
+        GRID_SIZE,
+        Size {
+            width: WINDOW_WIDTH,
+            height: WINDOW_HEIGHT,
+        },
+    );
 
     while let Some(e) = window.next() {
         window.draw_2d(&e, |c, g, _d| {
             app.render(c.transform, g);
         });
+
         if let Some(r) = e.render_args() {
             app.render_update(&r);
         }
@@ -97,8 +41,10 @@ fn main() {
             app.update(&u);
         }
 
-        if let Some(b) = e.press_args() {
-            app.press(&b);
+        if let Some(Button::Keyboard(key)) = e.press_args() {
+            app.handle_input(key);
         }
     }
+
+    Ok(())
 }

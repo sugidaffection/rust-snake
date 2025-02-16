@@ -4,26 +4,30 @@
 
 - [About](#about)
 - [Getting Started](#getting_started)
+- [Prerequisites](#prerequisites)
+- [Run the Game](#run)
 
-## About <a name = "about"></a>
+## About <a name="about"></a>
 
-Snake game using piston engine written in rustlang
+A classic Snake game built using the `piston_window` crate in Rust. This project demonstrates smooth animations and game mechanics using the Piston game engine.
 
-## Getting Started <a name = "getting_started"></a>
+## Getting Started <a name="getting_started"></a>
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
+Follow these steps to set up and run the game on your local machine.
 
-### Prerequisites
+## Prerequisites <a name="prerequisites"></a>
 
-What things you need to install the software and how to install them.
+Ensure you have Rust installed:
 
+```sh
+rustup install stable
+cargo install
 ```
-rustc
-cargo
-```
 
-### Run
+## Run the Game <a name="run"></a>
 
-```
+To start the game, use:
+
+```sh
 cargo run
 ```
